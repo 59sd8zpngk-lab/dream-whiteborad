@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#26302e">
+<title>夢幻白板｜即時漢語拼音・注音</title>
+<script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.29.4/dist/index.min.js"></script>
+<style>
+:root{--paper:#fffdf8;--bar:#26302e;--accent:#f0a33a;--ink:#111;--muted:#60706a;--line:#ded9cf}
+*{box-sizing:border-box}html,body{margin:0;background:var(--paper);color:var(--ink)}
+body{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif}
+button,input,select{font:inherit}
+button{border:0;border-radius:8px;background:#4b5754;color:#fff;padding:8px 11px;cursor:pointer}
+button:hover{filter:brightness(1.08)}button.active{background:var(--accent);color:#151515}
+button:disabled{opacity:.4;cursor:not-allowed}
+.top{position:sticky;top:0;z-index:30;background:var(--bar);padding:8px 10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;box-shadow:0 2px 12px #0003}
+.group{display:flex;gap:5px;align-items:center;border-right:1px solid #ffffff22;padding-right:7px}.group:last-child{border:0}
+.sw{width:30px;height:30px;padding:0;border:2px solid #fff}.custom{width:30px;height:30px;padding:2px}
+.main{max-width:1250px;margin:auto;padding:38px 52px 120px}
+h1{font-size:clamp(42px,6vw,78px);line-height:1.1;margin:0 0 28px;font-weight:850;letter-spacing:.03em}
+.note{font-size:14px;color:var(--muted);margin:-15px 0 16px}
+.editorShell{position:relative;min-height:520px;overflow:auto}
+.layer,.input{
+ position:absolute;inset:0;width:100%;min-height:520px;padding:4px 2px 80px;
+ font-size:58px;font-weight:800;line-height:1.72;letter-spacing:0;
+ font-family:inherit;white-space:pre-wrap;word-break:break-word;
+}
+.layer{pointer-events:none;z-index:1}
+.input{z-index:2;resize:none;border:0;outline:0;background:transparent;color:transparent;caret-color:#111;overflow:auto;line-height:1.72}
+.input::selection{background:rgba(240,163,58,.25);color:transparent}
+.char{display:inline-flex;flex-direction:column;vertical-align:top;align-items:center;min-width:.9em}
+.py{height:1.02em;font-size:.25em;line-height:1;font-weight:500;color:#587266;white-space:nowrap}
+.han{line-height:1.08;border-radius:5px;padding:0 1px;transition:background .1s}
+.han.colored{color:var(--c)}
+.punct{white-space:pre}
+.tip{position:fixed;left:15px;bottom:15px;background:#111;color:#fff;padding:8px 12px;border-radius:9px;font-size:13px;z-index:40;opacity:.9}
+.panel{position:fixed;right:18px;bottom:18px;width:min(340px,calc(100vw - 36px));background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px;box-shadow:0 12px 40px #0002;display:none;z-index:50}
+.panel.show{display:block}.panel h3{margin:0 0 10px}.panel input,.panel select{width:100%;padding:9px;border:1px solid #ccc;border-radius:8px;margin:4px 0}
+.row{display:flex;gap:6px;margin-top:8px}
+.help{position:fixed;right:18px;top:70px;width:290px;background:white;border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:0 12px 40px #0002;display:none;z-index:50;font-size:13px;line-height:1.75}.help.show{display:block}
+@media(max-width:720px){
+ .top{padding:6px}.group{border:0;padding:0}.top button{font-size:12px;padding:7px 8px}
+ .main{padding:26px 16px 100px}h1{font-size:43px}.note{font-size:12px}
+ .editorShell,.layer,.input{min-height:62vh;font-size:40px}
+}
+@media print{
+ .top,.tip,.panel,.help,.note{display:none!important}.main{padding:10px}
+ .editorShell{overflow:visible}.input{display:none}.layer{position:static;min-height:0}
+}
+</style>
+</head>
+<body>
+<header class="top">
+ <div class="group">
+  <button id="clear">清空</button>
+  <button id="py" class="active">拼音：開</button>
+  <button id="zy">注音：關</button>
+ </div>
+ <div class="group">
+  <button id="undo">↶</button><button id="redo">↷</button>
+  <button id="smaller">字級−</button><button id="larger">字級＋</button>
+ </div>
+ <div class="group">
+  <button class="sw" data-c="#111" style="background:#111"></button>
+  <button class="sw" data-c="#d94841" style="background:#d94841"></button>
+  <button class="sw" data-c="#2477d4" style="background:#2477d4"></button>
+  <button class="sw" data-c="#2d8f54" style="background:#2d8f54"></button>
+  <button class="sw" data-c="#9958c9" style="background:#9958c9"></button>
+  <input class="custom" id="picker" type="color" value="#111" title="自訂顏色">
+ </div>
+ <div class="group">
+  <button id="reading">修改讀音</button><button id="uncolor">取消顏色</button><button id="helpBtn">？</button>
+ </div>
+ <div class="group">
+  <button id="save">儲存</button><button id="load">載入</button><button id="txt">文字</button><button id="pdf">PDF／列印</button>
+ </div>
+</header>
+
+<main class="main">
+ <h1>這是我的夢幻白板</h1>
+ <div class="note">直接輸入中文，漢語拼音會即時出現在每個字上方。拖曳選字後按顏色即可上色；雙擊字可修改讀音。</div>
+ <div class="editorShell" id="shell">
+   <div class="layer" id="layer"></div>
+   <textarea class="input" id="input" spellcheck="false" aria-label="夢幻白板"></textarea>
+ </div>
+</main>
+<div class="tip" id="tip">先試著打：「這是我的夢幻白板」</div>
+
+<div class="panel" id="panel">
+ <h3>修改選取中文字的讀音</h3>
+ <div id="chosen" style="font-size:32px;font-weight:800">—</div>
+ <input id="readInput" placeholder="例如：háng 或 ㄏㄤˊ">
+ <select id="readKind"><option value="pinyin">漢語拼音</option><option value="zhuyin">注音</option></select>
+ <div class="row"><button id="apply">套用</button><button id="close">關閉</button></div>
+</div>
+<div class="help" id="help">
+ <b>使用方法</b><br>
+ 1. 直接打字，拼音即時更新。<br>
+ 2. 用滑鼠／手指拖曳選字，再按顏色。<br>
+ 3. 選一個中文字，按「修改讀音」。<br>
+ 4. 「儲存」會保存文字、顏色與自訂讀音。<br>
+ 5. 「PDF／列印」可選「另存為 PDF」。<br>
+ <br>這版使用 <b>pinyin-pro</b> 產生漢語拼音，不再依賴少量內建字典。
+</div>
+
+<script>
+const {pinyin}=window.pinyinPro;
+const input=document.getElementById('input'), layer=document.getElementById('layer'), shell=document.getElementById('shell');
+let state={text:'這是我的夢幻白板\\n我可以一邊打字一邊寫', colors:{}, overrides:{}, size:58, pinyin:true, zhuyin:false};
+let undoStack=[], redoStack=[], lastSelection=[0,0];
+
+function snapshot(){return JSON.stringify(state)}
+function push(){const s=snapshot();if(!undoStack.length||undoStack[undoStack.length-1]!==s)undoStack.push(s);if(undoStack.length>60)undoStack.shift();redoStack=[];buttons()}
+function restore(s){state=JSON.parse(s);input.value=state.text;render();buttons()}
+function buttons(){document.getElementById('undo').disabled=undoStack.length<2;document.getElementById('redo').disabled=!redoStack.length}
+function isHan(c){return /[\u3400-\u9fff]/.test(c)}
+function indexAtSelection(){return [input.selectionStart,input.selectionEnd]}
+function setSelection(a,b){input.focus();input.setSelectionRange(a,b);lastSelection=[a,b]}
+function pinyinOf(ch,i){
+ if(state.overrides[i]) return state.overrides[i];
+ try{return pinyin(ch,{toneType:'symbol',type:'array'})[0]||''}catch(e){return ''}
+}
+function zhuyinOf(py){
+ const tone=(py.match(/[1-5]$/)||[''])[0];
+ const s=py.replace(/[1-5]$/,'');
+ const initials=[['zh','ㄓ'],['ch','ㄔ'],['sh','ㄕ'],['b','ㄅ'],['p','ㄆ'],['m','ㄇ'],['f','ㄈ'],['d','ㄉ'],['t','ㄊ'],['n','ㄋ'],['l','ㄌ'],['g','ㄍ'],['k','ㄎ'],['h','ㄏ'],['j','ㄐ'],['q','ㄑ'],['x','ㄒ'],['r','ㄖ'],['z','ㄗ'],['c','ㄘ'],['s','ㄙ']];
+ let ini='',rest=s;
+ for(const [a,b] of initials){if(rest.startsWith(a)){ini=b;rest=rest.slice(a.length);break}}
+ const finals={
+ 'a':'ㄚ','o':'ㄛ','e':'ㄜ','ai':'ㄞ','ei':'ㄟ','ao':'ㄠ','ou':'ㄡ','an':'ㄢ','en':'ㄣ','ang':'ㄤ','eng':'ㄥ','er':'ㄦ',
+ 'i':'ㄧ','ia':'ㄧㄚ','ie':'ㄧㄝ','iao':'ㄧㄠ','iu':'ㄧㄡ','ian':'ㄧㄢ','in':'ㄧㄣ','iang':'ㄧㄤ','ing':'ㄧㄥ','iong':'ㄩㄥ',
+ 'u':'ㄨ','ua':'ㄨㄚ','uo':'ㄨㄛ','uai':'ㄨㄞ','ui':'ㄨㄟ','uan':'ㄨㄢ','un':'ㄨㄣ','uang':'ㄨㄤ','ong':'ㄨㄥ',
+ 'ü':'ㄩ','üe':'ㄩㄝ','üan':'ㄩㄢ','ün':'ㄩㄣ'
+ };
+ let fin=finals[rest]||'';
+ if(!fin && rest.startsWith('u') && ['j','q','x','y'].includes((s[0]||'')))fin=finals['ü']||'';
+ if(ini==='ㄐ'||ini==='ㄑ'||ini==='ㄒ'){rest=rest.replace(/^u/,'ü');fin=finals[rest]||fin}
+ const mark={'1':'','2':'ˊ','3':'ˇ','4':'ˋ','5':'˙'}[tone]||'';
+ return ini+fin+mark
+}
+function render(){
+ input.style.fontSize=state.size+'px';layer.style.fontSize=state.size+'px';
+ layer.innerHTML='';
+ const text=state.text;
+ [...text].forEach((ch,i)=>{
+   if(ch==='\\n'){layer.appendChild(document.createElement('br'));return}
+   if(isHan(ch)){
+     const box=document.createElement('span');box.className='char';
+     const rt=document.createElement('span');rt.className='py';
+     let py=pinyinOf(ch,i);
+     rt.textContent=state.pinyin?py:(state.zhuyin?zhuyinOf(py):'');
+     const han=document.createElement('span');han.className='han';
+     han.textContent=ch;
+     if(state.colors[i]){han.classList.add('colored');han.style.setProperty('--c',state.colors[i])}
+     box.append(rt,han);layer.appendChild(box);
+   }else{const s=document.createElement('span');s.className='punct';s.textContent=ch;layer.appendChild(s)}
+ });
+ document.getElementById('py').classList.toggle('active',state.pinyin);
+ document.getElementById('zy').classList.toggle('active',state.zhuyin);
+ input.value=state.text;
+ syncScroll();
+}
+function syncScroll(){layer.scrollTop=input.scrollTop;layer.scrollLeft=input.scrollLeft}
+input.addEventListener('scroll',syncScroll);
+input.addEventListener('input',()=>{
+ push();
+ state.text=input.value;
+ // 重建索引型資料：若刪到尾端就移除
+ for(const k of Object.keys(state.colors))if(+k>=state.text.length)delete state.colors[k];
+ for(const k of Object.keys(state.overrides))if(+k>=state.text.length)delete state.overrides[k];
+ render();
+ // 保持游標
+ setSelection(input.selectionStart,input.selectionEnd);
+});
+input.addEventListener('select',()=>lastSelection=indexAtSelection());
+input.addEventListener('keyup',()=>lastSelection=indexAtSelection());
+input.addEventListener('click',()=>lastSelection=indexAtSelection());
+
+function selectedIndices(){
+ const [a,b]=lastSelection[0]!==undefined?lastSelection:indexAtSelection();
+ const out=[];for(let i=a;i<b;i++)if(isHan(state.text[i]))out.push(i);return out
+}
+function colorSelected(c){
+ const idx=selectedIndices();
+ if(!idx.length){document.getElementById('tip').textContent='請先拖曳選取文字，再按顏色';return}
+ push();idx.forEach(i=>state.colors[i]=c);render();setSelection(lastSelection[0],lastSelection[1]);
+ document.getElementById('tip').textContent='已上色 '+idx.length+' 個字'
+}
+document.querySelectorAll('.sw').forEach(b=>b.onclick=()=>colorSelected(b.dataset.c));
+document.getElementById('picker').onchange=e=>colorSelected(e.target.value);
+document.getElementById('uncolor').onclick=()=>{
+ const idx=selectedIndices();if(!idx.length)return;
+ push();idx.forEach(i=>delete state.colors[i]);render();setSelection(lastSelection[0],lastSelection[1])
+}
+document.getElementById('py').onclick=()=>{push();state.pinyin=!state.pinyin;render()}
+document.getElementById('zy').onclick=()=>{push();state.zhuyin=!state.zhuyin;state.pinyin=false;render()}
+document.getElementById('larger').onclick=()=>{push();state.size=Math.min(96,state.size+4);render()}
+document.getElementById('smaller').onclick=()=>{push();state.size=Math.max(28,state.size-4);render()}
+document.getElementById('clear').onclick=()=>{push();state.text='';state.colors={};state.overrides={};render();setSelection(0,0)}
+document.getElementById('undo').onclick=()=>{if(undoStack.length<2)return;redoStack.push(undoStack.pop());restore(undoStack[undoStack.length-1])}
+document.getElementById('redo').onclick=()=>{if(!redoStack.length)return;undoStack.push(redoStack.pop());restore(undoStack[undoStack.length-1])}
+
+function openReading(){
+ const idx=selectedIndices();
+ if(idx.length!==1){document.getElementById('tip').textContent='請先只選一個中文字，再按「修改讀音」';return}
+ const i=idx[0],ch=state.text[i];
+ document.getElementById('chosen').textContent=ch;
+ document.getElementById('readInput').value=state.overrides[i]||pinyinOf(ch,i)||'';
+ document.getElementById('readKind').value='pinyin';
+ document.getElementById('panel').classList.add('show');
+}
+document.getElementById('reading').onclick=openReading;
+document.getElementById('close').onclick=()=>document.getElementById('panel').classList.remove('show');
+document.getElementById('apply').onclick=()=>{
+ const idx=selectedIndices();if(idx.length!==1)return;
+ push();state.overrides[idx[0]]=document.getElementById('readInput').value.trim();render();document.getElementById('panel').classList.remove('show')
+}
+document.getElementById('helpBtn').onclick=()=>document.getElementById('help').classList.toggle('show');
+
+document.getElementById('save').onclick=()=>{
+ localStorage.setItem('dreamWhiteboardV3',JSON.stringify(state));
+ document.getElementById('tip').textContent='已儲存'
+}
+document.getElementById('load').onclick=()=>{
+ const s=localStorage.getItem('dreamWhiteboardV3');if(!s)return;
+ push();state=JSON.parse(s);render();document.getElementById('tip').textContent='已載入'
+}
+document.getElementById('txt').onclick=()=>{
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([state.text],{type:'text/plain;charset=utf-8'}));a.download='夢幻白板.txt';a.click()
+}
+document.getElementById('pdf').onclick=()=>window.print();
+
+input.addEventListener('dblclick',()=>{
+ const [a,b]=indexAtSelection();if(b-a===1&&isHan(state.text[a]))openReading()
+});
+window.addEventListener('beforeunload',()=>localStorage.setItem('dreamWhiteboardV3',JSON.stringify(state)));
+
+undoStack=[snapshot()];
+render();
+buttons();
+</script>
+</body>
+</html>
